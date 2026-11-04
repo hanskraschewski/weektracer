@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.10)
 
 project(weektracer)
 
-set(CMAKE__CXX_STANDART 17)
-set(CMAKE_CXX_STANDART_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(weektracer main.cpp)
+set( SOURCES
+    src/main.cpp
+    src/color.h
+    src/vec3.h
+)
+
+add_executable(weektracer src/main.cpp)
