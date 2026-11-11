@@ -3,6 +3,8 @@
 
 #include "hittable.h"
 #include "material.h"
+#include <vector>
+#include <chrono>
 
 class camera {
     public:
@@ -22,10 +24,16 @@ class camera {
         void render(const hittable& world) {
             initialize();
 
-            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+            std::vector<color> image(image_width * image_height);
 
+            std::clog << "Start Rendering" << std::endl;
+
+            auto start = std::chrono::high_resolution_clock::now();
+            int done = 0;
+            #pragma omp parallel for
             for (int j = 0; j < image_height; j++) {
-                std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+                //std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+                //#pragma omp parallel for
                 for (int i = 0; i < image_width; i++) {
                     color pixel_color(0,0,0);
                     for (int sample = 0; sample < samples_per_pixel; sample++) {
@@ -33,11 +41,26 @@ class camera {
                         pixel_color += ray_color(r, max_depth, world);
                     }
 
-                    write_color(std::cout, pixel_samples_scale * pixel_color);
+                    image[j * image_width + i] = pixel_samples_scale * pixel_color;
+                }
+            }
+            auto mid = std::chrono::high_resolution_clock::now();
+            std::clog << "\nStart Writing" << std::endl;
+            
+            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+            for (int j = 0; j < image_height; ++j) {
+                //std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+                for (int i = 0; i < image_width; ++i) {
+                    write_color(std::cout, image[j * image_width + i]);
                 }
             }
 
-            std::clog << "\rDone.                 \n";
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration_render = std::chrono::duration_cast<std::chrono::milliseconds>(mid - start) / 1000.0;
+            auto duration_print = std::chrono::duration_cast<std::chrono::milliseconds>(end - mid) / 1000.0;
+
+            std::clog << "\nRender time: " << duration_render.count() << " s\n" ;
+            std::clog << "\nPrint time: " << duration_print.count() << " s\n" ;
     }
 
     private:
