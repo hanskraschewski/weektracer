@@ -147,4 +147,15 @@ inline vec3 normalize(const vec3& v) {
     return unit_vector(v);
 }
 
+inline void ortho_basis(const vec3& v, vec3& b0, vec3& b1, vec3& b2) {
+    b0 = unit_vector(v);
+    double sign = copysignf(1.0f, b0.z());
+    const double a = -1.0f / (sign + b0.z());
+    const double b = b0.x() * b0.y() * a;
+    b1 = vec3(1.0f + sign * b0.x() * b0.x() * a, sign * b, -sign * b0.x());
+    b2 = vec3(b, sign + b0.y() * b0.y() * a, -b0.y()); 
+}
+
+
+
 #endif
