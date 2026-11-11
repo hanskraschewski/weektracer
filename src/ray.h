@@ -21,4 +21,16 @@ class ray {
         vec3 dir;
 };
 
+/*
+inline vec3 vec3_to_rcc(const ray& r, const vec3& a) {
+    vec3 b0, b1, b2;
+    ortho_basis(r.direction(), b0, b1, b2);
+
+    return vec3(dot(a, b1), dot(a, b2), dot(a, b0));
+}
+
+inline point3 point3_to_rcc(const ray& r, const point3& a) {
+    return vec3_to_rcc(r, a - r.origin());
+}
+    */
 #endif
