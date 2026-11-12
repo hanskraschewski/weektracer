@@ -18,24 +18,24 @@ struct RayConeIntersection {
             double r2 = r * r;
             double drr = r * dr;
 
-            double ddd  = cd.x() * cd.x() + cd.y() * cd.y();
+            double cdcd  = cd.x() * cd.x() + cd.y() * cd.y();
             dp          = (c0.x() * c0.x() + c0.y() * c0.y());
-            double cdd  = c0.x() * cd.x() + c0.y() * cd.y();
-            double cxd  = c0.x() * cd.y() - c0.y() * cd.x();
+            double c0cd  = c0.x() * cd.x() + c0.y() * cd.y();
+            double c0xcd  = c0.x() * cd.y() - c0.y() * cd.x();
 
-            double c    = ddd;
-            double b    = cd.z() * (drr - cdd);
+            double c    = cdcd;
+            double b    = cd.z() * (drr - c0cd);
             double cdz2 = cd.z() * cd.z();
-            ddd        += cdz2;
-            double a    = 2*drr*cdd + cxd*cxd - ddd*r2 + dp*cdz2;
+            cdcd        += cdz2;
+            double a    = 2*drr*c0cd + c0xcd*c0xcd - cdcd*r2 + dp*cdz2;
 
             // here dr squared terms
 
             double det = b * b - a * c;
             s          = (b - (det > 0 ? sqrt(det) : 0))/c;
-            dt         = (s*cd.z() - cdd)/ddd;
+            dt         = (s*cd.z() - c0cd)/cdcd;
             dc         = s*s + dp;
-            sp         = cdd/cd.z();
+            sp         = c0cd/cd.z();
             dp        += sp*sp;
 
             return det > 0;
