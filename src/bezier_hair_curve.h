@@ -18,24 +18,32 @@ struct RayConeIntersection {
             double r2 = r * r;
             double drr = r * dr;
 
-            double cdcd  = cd.x() * cd.x() + cd.y() * cd.y();
-            dp          = (c0.x() * c0.x() + c0.y() * c0.y());
-            double c0cd  = c0.x() * cd.x() + c0.y() * cd.y();
-            double c0xcd  = c0.x() * cd.y() - c0.y() * cd.x();
+            double ddd  = cd.x() * cd.x() + cd.y() * cd.y(); // ddd
+            dp          = (c0.x() * c0.x() + c0.y() * c0.y()); 
+            double cdd  = c0.x() * cd.x() + c0.y() * cd.y(); // cdd
+            double cxd  = c0.x() * cd.y() - c0.y() * cd.x(); // cxd
 
-            double c    = cdcd;
-            double b    = cd.z() * (drr - c0cd);
+            double c    = ddd;
+            double b    = cd.z() * (drr - cdd);
             double cdz2 = cd.z() * cd.z();
-            cdcd        += cdz2;
-            double a    = 2*drr*c0cd + c0xcd*c0xcd - cdcd*r2 + dp*cdz2;
+            ddd        += cdz2;
+            double a    = 2*drr*cdd + cxd*cxd - ddd*r2 + dp*cdz2;
 
-            // here dr squared terms
+            // here dr squared terms, which can be dropped because the radius changes only slightly 
+            // typical hair models and it does not affect convergence
+            // maybe important for drastically changing radii
+            if (false) {
+                double qs = (dr * dr) / ddd;
+                a -= qs * cdd *cdd;
+                b -= qs * cd.z() * cdd;
+                c -= qs * cdz2;
+            }
 
             double det = b * b - a * c;
             s          = (b - (det > 0 ? sqrt(det) : 0))/c;
-            dt         = (s*cd.z() - c0cd)/cdcd;
+            dt         = (s*cd.z() - cdd)/ddd;
             dc         = s*s + dp;
-            sp         = c0cd/cd.z();
+            sp         = cdd/cd.z();
             dp        += sp*sp;
 
             return det > 0;
