@@ -68,23 +68,34 @@ class bezier_hair_curve : public hittable {
             to_rcc(r, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
 
             double s0, t0, s1, t1;
-            bool hit0 = trace_from(0.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s0, t0);
-            bool hit1 = trace_from(1.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s1, t1);
+            bool is_cap, cap0, cap1;;
+            bool hit0 = trace_from(0.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s0, t0, cap0);
+            bool hit1 = trace_from(1.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s1, t1, cap1);
             if (!hit0 && !hit1) return false;
 
             double s, t;
-            if (hit0 && (!hit1 || s0 < s1)) { s = s0; t = t0; }
-            else                            { s = s1; t = t1; }
+            if (hit0 && (!hit1 || s0 < s1)) { s = s0; t = t0; is_cap = cap0;}
+            else                            { s = s1; t = t1; is_cap = cap1;}
 
             s /= r.direction().length();
             if (!ray_t.surrounds(s)) return false;
-
+            
+            
             vec3 p = r.at(s);
-            point3 world_c = curve_point(t);
-            vec3 world_dc = tangent(t);
-            vec3 v = p - world_c;
-            vec3 n = v - dot(v, world_dc)*world_dc/world_dc.length_squared();
-            n = unit_vector(n);
+            
+            vec3 n;
+            if (is_cap) {
+                n = (t == 0) ? -tangent(0) : tangent(1);   
+                n = unit_vector(n);
+            }
+            else {
+                point3 world_c = curve_point(t);
+                vec3 world_dc = tangent(t);
+                vec3 v = p - world_c;
+                n = v - dot(v, world_dc)*world_dc/world_dc.length_squared();
+                n = unit_vector(n);
+                n = unit_vector(n - (r2 - r1)/(world_dc.length()) * unit_vector(world_dc));
+            }
             rec.set_face_normal(r, n);
             rec.t = s;
             rec.mat = mat;
@@ -102,12 +113,13 @@ class bezier_hair_curve : public hittable {
             bool trace_from(double t_start,
                             const point3& u0_rcc, const vec3& u1_rcc,
                             const vec3& u2_rcc, const vec3& u3_rcc,
-                            double& s_out, double& t_out) const {
+                            double& s_out, double& t_out,
+                            bool& is_cap) const {
                 const double eps = 5e-5;
                 const int max_iter = 50;
                 const double dr = r2 - r1;
                 interval clamp_dt(-0.5, 0.5);
-
+                    is_cap = false;
                     RayConeIntersection rc;
                     double t = t_start;
 
@@ -125,7 +137,21 @@ class bezier_hair_curve : public hittable {
                         }
 
                         t += clamp_dt.clamp(rc.dt);
-                        if (t < 0.0 || t > 1.0) return false;  // left the segment (buttend logic later)
+                        if (t < 0.0 || t > 1.0) {
+                            t = (t < 0) ? 0 : 1;
+                            rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                            rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                            double r_end = radius(t);
+                            rc.intersect(r_end, dr);
+                            bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
+                            if(enters_from_outside && rc.dp < r_end*r_end) {
+                                s_out = rc.sp + rc.c0.z();
+                                t_out = t;
+                                is_cap = true;
+                                return true;
+                            }
+                            return false;
+                        }  // left the segment (buttend logic)
                     }
                     return false;                              // hit the iteration cap, not converged
             }

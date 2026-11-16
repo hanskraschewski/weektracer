@@ -27,29 +27,29 @@ int main() {
 
     auto glass = make_shared<dielectric>(1.0 / 1.3);
     std::array<point3, 4> control_points2 = {
-        point3(0.8, 0.7, -1.0),
-        point3(1.05, 1.5, -0.8),
-        point3(1.55, 0.55, 0.6),
-        point3(1.8, 1.0, 1.0)
+        point3(1.9, 0.35, -0.75),
+        point3(1.55, 0.35, -0.75),
+        point3(1.1, 0.6, -0.65),
+        point3(0.7, 0.45, -0.55)
     };
 
     auto lambert = make_shared<lambertian>(color(0.8, 0.2, 1.0));
     std::array<point3, 4> control_points3 = {
-        point3(0.8, 0.35, -1.0),
-        point3(1.05, 1.15, -0.8),
-        point3(1.55, 0.2, 0.5),
-        point3(1.8, 0.65, 0.9)
+        point3(1.9, 0.3, 0.5),
+        point3(1.55, 0.3, 0.5),
+        point3(1.0, 0.5, 1.0),
+        point3(0.6, 0.35, 1.2)
     };
 
 
     world.add(make_shared<bezier_hair_curve>(control_points1, 0.06, 0.01, metallic));
-    //world.add(make_shared<bezier_hair_curve>(control_points2, 0.06, 0.01, glass));
-    //world.add(make_shared<bezier_hair_curve>(control_points3, 0.06, 0.01, lambert));
+    world.add(make_shared<bezier_hair_curve>(control_points2, 0.06, 0.01, metallic));
+    world.add(make_shared<bezier_hair_curve>(control_points3, 0.06, 0.01, lambert));
 
     camera cam;
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 1920;
-    cam.samples_per_pixel = 100;
+    cam.image_width = 1200;
+    cam.samples_per_pixel = 20;
     cam.max_depth = 40;
 
     cam.vfov = 30;
