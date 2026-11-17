@@ -67,20 +67,28 @@ class bezier_hair_curve : public hittable {
             point3 u0_rcc; vec3 u1_rcc, u2_rcc, u3_rcc;
             to_rcc(r, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
 
-            double s0, t0, s1, t1;
-            bool is_cap, cap0, cap1;;
-            bool hit0 = trace_from(0.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s0, t0, cap0);
-            bool hit1 = trace_from(1.0, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s1, t1, cap1);
-            if (!hit0 && !hit1) return false;
-
             double s, t;
-            if (hit0 && (!hit1 || s0 < s1)) { s = s0; t = t0; is_cap = cap0;}
-            else                            { s = s1; t = t1; is_cap = cap1;}
+            bool is_cap = false;
+            bool hit = false;
+            // start at closer end
+            double t_start = (u1_rcc + u2_rcc + u3_rcc).z() > 0 ? 0.0 : 1.0;
+            double len = r.direction().length();
+            hit = trace_from(t_start, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s, t, is_cap);
+            if (hit) { 
+                s /= len; 
+                if (!ray_t.surrounds(s)) hit = false; 
+            }
+            // if closer end returned false/is outside of t range try with far end
+            if (!hit) {
+                hit = trace_from(1.0 - t_start, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s, t, is_cap);
+                if (hit) { 
+                    s /= len; 
+                    if (!ray_t.surrounds(s)) hit = false; 
+                }
+            }
 
-            s /= r.direction().length();
-            if (!ray_t.surrounds(s)) return false;
-            
-            
+            if (!hit) return false;
+
             vec3 p = r.at(s);
             
             vec3 n;
@@ -115,45 +123,79 @@ class bezier_hair_curve : public hittable {
                             const vec3& u2_rcc, const vec3& u3_rcc,
                             double& s_out, double& t_out,
                             bool& is_cap) const {
-                const double eps = 5e-5;
-                const int max_iter = 50;
-                const double dr = r2 - r1;
-                interval clamp_dt(-0.5, 0.5);
-                    is_cap = false;
-                    RayConeIntersection rc;
-                    double t = t_start;
+                const double eps = 5e-5; // if ∆t smaller eps: success
+                const int max_iter = 50; 
+                const double dr = r2 - r1; // derivative of linear radius
+                interval clamp_dt(-0.5, 0.5); // clamp magnitude of ∆t to 0.5
+                is_cap = false;
+                RayConeIntersection rc;
+                double t = t_start;
 
-                    for (int iter = 0; iter < max_iter; ++iter) {
+                // regula falsi/bisection variables
+                double t_pos, f_pos, t_neg, f_neg;
+                bool n_brack = false, p_brack = false, bracket = false;
+                // previous iteration signs for regula falsi
+                double t_prev, f_prev;
+                bool has_prev = false;
+
+                for (int iter = 0; iter < max_iter; ++iter) {
+                    rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                    rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                    bool real = rc.intersect(radius(t), dr);
+                    
+                    // converged: decide now, while s and t still belong together
+                    if (std::fabs(rc.dt) < eps) {
+                        if (!real) return false;          // converged phantom = near miss
+                        s_out = rc.s + rc.c0.z();
+                        t_out = t;
+                        return true;
+                    }
+
+                    rc.dt = clamp_dt.clamp(rc.dt);
+                    
+                    // set regula falsi
+                    if (rc.dt > 0) {
+                        f_pos = rc.dt;
+                        t_pos = t;
+                        p_brack = true;
+                    } else {
+                        f_neg = rc.dt;
+                        t_neg = t;
+                        n_brack = true;
+                    }
+                    if (p_brack && n_brack) bracket = true;
+                    
+                    // no bracket exists, normal step, otherwise regula falsi step
+                    if (bracket && (iter % 4) == 0) 
+                        t = (t_pos + t_neg) / 2;
+                    else if (has_prev && f_prev * rc.dt < 0) 
+                        t = (f_pos * t_neg - f_neg * t_pos) / (f_pos - f_neg);
+                    else
+                        t += rc.dt;
+                    
+                    t_prev = t;
+                    f_prev = rc.dt;
+                    has_prev = true;
+
+
+                    // buttend hit logic
+                    if (t < 0.0 || t > 1.0) {
+                        t = (t < 0) ? 0.0 : 1.0;
                         rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
                         rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                        bool real = rc.intersect(radius(t), dr);
-
-                        // converged: decide now, while s and t still belong together
-                        if (std::fabs(rc.dt) < eps) {
-                            if (!real) return false;          // converged phantom = near miss
-                            s_out = rc.s + rc.c0.z();
+                        double r_end = radius(t);
+                        rc.intersect(r_end, dr);
+                        bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
+                        if(enters_from_outside && rc.dp < r_end*r_end) {
+                            s_out = rc.sp + rc.c0.z();
                             t_out = t;
+                            is_cap = true;
                             return true;
                         }
-
-                        t += clamp_dt.clamp(rc.dt);
-                        if (t < 0.0 || t > 1.0) {
-                            t = (t < 0) ? 0 : 1;
-                            rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                            rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                            double r_end = radius(t);
-                            rc.intersect(r_end, dr);
-                            bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
-                            if(enters_from_outside && rc.dp < r_end*r_end) {
-                                s_out = rc.sp + rc.c0.z();
-                                t_out = t;
-                                is_cap = true;
-                                return true;
-                            }
-                            return false;
-                        }  // left the segment (buttend logic)
-                    }
-                    return false;                              // hit the iteration cap, not converged
+                        return false;
+                    } 
+                }
+                return false;                              // hit the iteration cap, not converged
             }
             
             point3 curve_point(double t) const {
