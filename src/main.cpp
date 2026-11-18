@@ -12,6 +12,7 @@
 
 int main() {
     
+    /*
     hittable_list world;
 
     auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
@@ -59,8 +60,8 @@ int main() {
     cam.defocus_angle = 0;
     cam.focus_dist = 4.0;
     cam.render(world);
-    
-   /*
+    */
+   
    hittable_list world;
 
     auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -78,7 +79,8 @@ int main() {
                     // diffuse
                     auto albedo = color::random() * color::random();
                     sphere_material = make_shared<lambertian>(albedo);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                    auto center2 = center + vec3(0, random_double(0,.5), 0);
+                    world.add(make_shared<sphere>(center, center2, 0.2, sphere_material));
                 } else if (choose_mat < 0.95) {
                     // metal
                     auto albedo = color::random(0.5, 1);
@@ -106,7 +108,7 @@ int main() {
     camera cam;
 
     cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 1200;
+    cam.image_width       = 800;
     cam.samples_per_pixel = 100;
     cam.max_depth         = 20;
 
@@ -119,5 +121,5 @@ int main() {
     cam.focus_dist    = 10.0;
 
     cam.render(world);
-    */
+    
 }
