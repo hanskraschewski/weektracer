@@ -5,7 +5,7 @@
 #include "material.h"
 #include <vector>
 #include <chrono>
-
+#include <fstream>
 class camera {
     public:
         double aspect_ratio = 1.0;
@@ -47,14 +47,7 @@ class camera {
             auto mid = std::chrono::high_resolution_clock::now();
             std::clog << "\nStart Writing" << std::endl;
             
-            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
-            for (int j = 0; j < image_height; ++j) {
-                //std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-                for (int i = 0; i < image_width; ++i) {
-                    write_color(std::cout, image[j * image_width + i]);
-                }
-            }
-
+            write_P6(image);
             auto end = std::chrono::high_resolution_clock::now();
             auto duration_render = std::chrono::duration_cast<std::chrono::milliseconds>(mid - start) / 1000.0;
             auto duration_print = std::chrono::duration_cast<std::chrono::milliseconds>(end - mid) / 1000.0;
@@ -154,6 +147,29 @@ class camera {
             vec3 unit_direction = unit_vector(r.direction());
             auto a = 0.5*(unit_direction.y() + 1.0);
             return (1.0 - a) * color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+        }
+
+        void write_P3(std::vector<color>& image) {
+            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+            for (int j = 0; j < image_height; ++j) {
+                for (int i = 0; i < image_width; ++i) {
+                    write_color(std::cout, image[j * image_width + i]);
+                }
+            }
+        }
+
+        void write_P6(std::vector<color>& image) {
+            std::vector<unsigned char> bytes(size_t(image_width) * image_height * 3);
+
+            #pragma omp parallel for
+            for (int p = 0; p < image_width * image_height; p++) {
+                color_to_bytes(image[p], &bytes[3 * p]);
+            }
+
+            std::ofstream file("image.ppm", std::ios::binary);
+            file << "P6\n" << image_width << ' ' << image_height << "\n255\n";
+            file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            file.close();
         }
 };
 #endif
