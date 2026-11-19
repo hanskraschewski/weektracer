@@ -113,14 +113,17 @@ class camera {
         ray get_ray(int i, int j) const {
             // Construct a camera ray originating from the defocus disk and directed at a randomly
             // sampled point around the pixel location i, j.
+
             auto offset = sample_square();
             auto pixel_sample = pixel00_loc
                                 + ((i + offset.x()) * pixel_delta_u)
                                 + ((j + offset.y()) * pixel_delta_v);
             auto ray_origin = (defocus_angle <= 0) ? center: defocus_disk_sample();
             auto ray_direction = pixel_sample - ray_origin;
+            auto ray_time = random_double();
 
-            return ray(ray_origin, ray_direction);
+
+            return ray(ray_origin, ray_direction, ray_time);
         }
 
         point3 defocus_disk_sample() const {
