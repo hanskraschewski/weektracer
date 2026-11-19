@@ -9,62 +9,7 @@
 #include "bezier_hair_curve.h"
 #include <omp.h>
 
-
-
-int main() {
-    std::ios::sync_with_stdio(false);
-    /*
-    hittable_list world;
-
-    auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
-    world.add(make_shared<sphere>(point3(0, -100.5, -1.0), 100.0, ground_material));
-
-    auto metallic = make_shared<metal>(color(0.6, 0.6, 0.6), 0.0);
-    std::array<point3, 4> control_points1 = {
-        point3(0.8, 0.95, -1.2),
-        point3(1.05, 1.75, -1.0),
-        point3(1.55, 0.8, 0.6),
-        point3(1.8, 1.25, 0.9)
-    };
-
-    auto glass = make_shared<dielectric>(1.0 / 1.3);
-    std::array<point3, 4> control_points2 = {
-        point3(1.9, 0.35, -0.75),
-        point3(1.55, 0.35, -0.75),
-        point3(1.1, 0.6, -0.65),
-        point3(0.7, 0.45, -0.55)
-    };
-
-    auto lambert = make_shared<lambertian>(color(0.8, 0.2, 1.0));
-    std::array<point3, 4> control_points3 = {
-        point3(1.9, 0.3, 0.5),
-        point3(1.55, 0.3, 0.5),
-        point3(1.0, 0.5, 1.0),
-        point3(0.6, 0.35, 1.2)
-    };
-
-
-    world.add(make_shared<bezier_hair_curve>(control_points1, 0.06, 0.01, metallic));
-    world.add(make_shared<bezier_hair_curve>(control_points2, 0.06, 0.01, metallic));
-    world.add(make_shared<bezier_hair_curve>(control_points3, 0.06, 0.01, lambert));
-
-    camera cam;
-    cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 800;
-    cam.samples_per_pixel = 100;
-    cam.max_depth = 50;
-
-    cam.vfov = 30;
-    cam.lookfrom = point3(4, 0.7, 0);
-    cam.lookat   = point3(0, 0.7, 0);
-    cam.vup      = vec3(0,1,0);
-    cam.defocus_angle = 0;
-    cam.focus_dist = 4.0;
-    cam.render(world);
-    */
-   
-   hittable_list world;
-
+void render_sphere_world(hittable_list& world) {
     auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
     world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
 
@@ -112,9 +57,9 @@ int main() {
     camera cam;
 
     cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 1200;
+    cam.image_width       = 800;
     cam.samples_per_pixel = 100;
-    cam.max_depth         = 20;
+    cam.max_depth         = 50;
 
     cam.vfov     = 20;
     cam.lookfrom = point3(13,2,3);
@@ -125,5 +70,64 @@ int main() {
     cam.focus_dist    = 10.0;
 
     cam.render(world);
+}
+
+void render_strand_world(hittable_list& world) {
+    auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
+    world.add(make_shared<sphere>(point3(0, -100.5, -1.0), 100.0, ground_material));
+
+    auto metallic = make_shared<metal>(color(0.6, 0.6, 0.6), 0.0);
+    std::array<point3, 4> control_points1 = {
+        point3(0.8, 0.95, -1.2),
+        point3(1.05, 1.75, -1.0),
+        point3(1.55, 0.8, 0.6),
+        point3(1.8, 1.25, 0.9)
+    };
+
+    auto glass = make_shared<dielectric>(1.0 / 1.3);
+    std::array<point3, 4> control_points2 = {
+        point3(1.9, 0.35, -0.75),
+        point3(1.55, 0.35, -0.75),
+        point3(1.1, 0.6, -0.65),
+        point3(0.7, 0.45, -0.55)
+    };
+
+    auto lambert = make_shared<lambertian>(color(0.8, 0.2, 1.0));
+    std::array<point3, 4> control_points3 = {
+        point3(1.9, 0.3, 0.5),
+        point3(1.55, 0.3, 0.5),
+        point3(1.0, 0.5, 1.0),
+        point3(0.6, 0.35, 1.2)
+    };
+
+
+    world.add(make_shared<bezier_hair_curve>(control_points1, 0.06, 0.01, metallic));
+    world.add(make_shared<bezier_hair_curve>(control_points2, 0.06, 0.01, metallic));
+    world.add(make_shared<bezier_hair_curve>(control_points3, 0.06, 0.01, lambert));
+
+    world = hittable_list(make_shared<bvh_node>(world));
+
+    camera cam;
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 800;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+
+    cam.vfov = 30;
+    cam.lookfrom = point3(4, 0.7, 0);
+    cam.lookat   = point3(0, 0.7, 0);
+    cam.vup      = vec3(0,1,0);
+    cam.defocus_angle = 0;
+    cam.focus_dist = 4.0;
+    cam.render(world);
+}
+
+int main() {
+    std::ios::sync_with_stdio(false);
+    
+    hittable_list world;
+    //render_sphere_world(world);
+    render_strand_world(world);
     
 }
+

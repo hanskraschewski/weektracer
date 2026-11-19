@@ -7,6 +7,22 @@
 
 #include <algorithm>
 
+class bvh_leaf : public hittable {
+public:
+    bvh_leaf(shared_ptr<hittable> obj) : obj(obj), bbox(obj->bounding_box()) {}
+
+    bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+        if (!bbox.hit(r, ray_t)) return false;
+        return obj->hit(r, ray_t, rec);
+    }
+
+    aabb bounding_box() const override { return bbox; }
+
+private:
+    shared_ptr<hittable> obj;
+    aabb bbox;
+};
+
 class bvh_node : public hittable {
   public:
     bvh_node(hittable_list list) : bvh_node(list.objects, 0, list.objects.size()) {
@@ -17,25 +33,25 @@ class bvh_node : public hittable {
         for (size_t object_index=start; object_index < end; object_index++) {
             bbox = aabb(bbox, objects[object_index] -> bounding_box());
         }
-        int axis = bbox.longest_axis();
-
-        auto comparator = (axis == 0) ? box_x_compare
-                        : (axis == 1) ? box_y_compare
-                                      : box_z_compare;
 
         size_t object_span = end-start;
 
         if (object_span == 1) {
-            left = right = objects[start];
-        } else if (object_span == 2) {
-            left = objects[start];
-            right = objects[start + 1];
+            // Only reachable when the whole world is a single object.
+            left  = make_shared<bvh_leaf>(objects[start]);
+            right = make_shared<hittable_list>();   
         } else {
+            int axis = bbox.longest_axis();
+
+            auto comparator = (axis == 0) ? box_x_compare
+                            : (axis == 1) ? box_y_compare
+                                          : box_z_compare;
+
             std::sort(std::begin(objects) + start, std::begin(objects) + end, comparator);
 
             auto mid = start + object_span/2;
-            left = make_shared<bvh_node>(objects, start, mid);
-            right = make_shared<bvh_node>(objects, mid, end);
+            left  = build(objects, start, mid);
+            right = build(objects, mid, end);
         }
 
         
@@ -76,6 +92,13 @@ class bvh_node : public hittable {
 
     static bool box_z_compare (const shared_ptr<hittable> a, const shared_ptr<hittable> b) {
         return box_compare(a, b, 2);
+    }
+
+    static shared_ptr<hittable> build(std::vector<shared_ptr<hittable>>& objects,
+            size_t start, size_t end) {
+        if (end - start == 1)
+            return make_shared<bvh_leaf>(objects[start]);
+        return make_shared<bvh_node>(objects, start, end);
     }
 };
 

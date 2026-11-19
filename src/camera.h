@@ -30,7 +30,7 @@ class camera {
 
             auto start = std::chrono::high_resolution_clock::now();
             int done = 0;
-            #pragma omp parallel for
+            #pragma omp parallel for schedule(dynamic, 4)
             for (int j = 0; j < image_height; j++) {
                 //std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
                 //#pragma omp parallel for

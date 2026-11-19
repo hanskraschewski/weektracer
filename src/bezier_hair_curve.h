@@ -61,6 +61,8 @@ class bezier_hair_curve : public hittable {
                             u1 = 3*(control_points[1] - control_points[0]);
                             u2 = 3*(control_points[0]-2*control_points[1]+control_points[2]);
                             u3 = -control_points[0]+3*control_points[1]-3*control_points[2]+control_points[3];
+
+                            set_bbox(control_points);
                         }
         
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
@@ -111,123 +113,135 @@ class bezier_hair_curve : public hittable {
 
             return true;
         }
+        
+        aabb bounding_box() const override { return bbox; }
 
-        private:
-            point3 u0, u1, u2, u3; // bezier curve points in world coordinates
-            point3 u0_rcc, u1_rcc, u2_rcc, u3_rcc; // bezier curves points in current rays rcc
-            double r1, r2;
-            shared_ptr<material> mat;
+    private:
+        point3 u0, u1, u2, u3; // bezier curve points in world coordinates
+        point3 u0_rcc, u1_rcc, u2_rcc, u3_rcc; // bezier curves points in current rays rcc
+        double r1, r2;
+        shared_ptr<material> mat;
+        aabb bbox;
 
-            bool trace_from(double t_start,
-                            const point3& u0_rcc, const vec3& u1_rcc,
-                            const vec3& u2_rcc, const vec3& u3_rcc,
-                            double& s_out, double& t_out,
-                            bool& is_cap) const {
-                const double eps = 5e-5; // if ∆t smaller eps: success
-                const int max_iter = 50; 
-                const double dr = r2 - r1; // derivative of linear radius
-                interval clamp_dt(-0.5, 0.5); // clamp magnitude of ∆t to 0.5
-                is_cap = false;
-                RayConeIntersection rc;
-                double t = t_start;
+        bool trace_from(double t_start,
+                        const point3& u0_rcc, const vec3& u1_rcc,
+                        const vec3& u2_rcc, const vec3& u3_rcc,
+                        double& s_out, double& t_out,
+                        bool& is_cap) const {
+            const double eps = 5e-5; // if ∆t smaller eps: success
+            const int max_iter = 50; 
+            const double dr = r2 - r1; // derivative of linear radius
+            interval clamp_dt(-0.5, 0.5); // clamp magnitude of ∆t to 0.5
+            is_cap = false;
+            RayConeIntersection rc;
+            double t = t_start;
 
-                // regula falsi/bisection variables
-                double t_pos, f_pos, t_neg, f_neg;
-                bool n_brack = false, p_brack = false, bracket = false;
-                // previous iteration signs for regula falsi
-                double t_prev, f_prev;
-                bool has_prev = false;
+            // regula falsi/bisection variables
+            double t_pos, f_pos, t_neg, f_neg;
+            bool n_brack = false, p_brack = false, bracket = false;
+            // previous iteration signs for regula falsi
+            double t_prev, f_prev;
+            bool has_prev = false;
 
-                for (int iter = 0; iter < max_iter; ++iter) {
+            for (int iter = 0; iter < max_iter; ++iter) {
+                rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                bool real = rc.intersect(radius(t), dr);
+                
+                // converged: decide now, while s and t still belong together
+                if (std::fabs(rc.dt) < eps) {
+                    if (!real) return false;          // converged phantom = near miss
+                    s_out = rc.s + rc.c0.z();
+                    t_out = t;
+                    return true;
+                }
+
+                rc.dt = clamp_dt.clamp(rc.dt);
+                
+                // set regula falsi
+                if (rc.dt > 0) {
+                    f_pos = rc.dt;
+                    t_pos = t;
+                    p_brack = true;
+                } else {
+                    f_neg = rc.dt;
+                    t_neg = t;
+                    n_brack = true;
+                }
+                if (p_brack && n_brack) bracket = true;
+                
+                // no bracket exists, normal step, otherwise regula falsi step
+                if (bracket && (iter % 4) == 0) 
+                    t = (t_pos + t_neg) / 2;
+                else if (has_prev && f_prev * rc.dt < 0) 
+                    t = (f_pos * t_neg - f_neg * t_pos) / (f_pos - f_neg);
+                else
+                    t += rc.dt;
+                
+                t_prev = t;
+                f_prev = rc.dt;
+                has_prev = true;
+
+
+                // buttend hit logic
+                if (t < 0.0 || t > 1.0) {
+                    t = (t < 0) ? 0.0 : 1.0;
                     rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
                     rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                    bool real = rc.intersect(radius(t), dr);
-                    
-                    // converged: decide now, while s and t still belong together
-                    if (std::fabs(rc.dt) < eps) {
-                        if (!real) return false;          // converged phantom = near miss
-                        s_out = rc.s + rc.c0.z();
+                    double r_end = radius(t);
+                    rc.intersect(r_end, dr);
+                    bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
+                    if(enters_from_outside && rc.dp < r_end*r_end) {
+                        s_out = rc.sp + rc.c0.z();
                         t_out = t;
+                        is_cap = true;
                         return true;
                     }
-
-                    rc.dt = clamp_dt.clamp(rc.dt);
-                    
-                    // set regula falsi
-                    if (rc.dt > 0) {
-                        f_pos = rc.dt;
-                        t_pos = t;
-                        p_brack = true;
-                    } else {
-                        f_neg = rc.dt;
-                        t_neg = t;
-                        n_brack = true;
-                    }
-                    if (p_brack && n_brack) bracket = true;
-                    
-                    // no bracket exists, normal step, otherwise regula falsi step
-                    if (bracket && (iter % 4) == 0) 
-                        t = (t_pos + t_neg) / 2;
-                    else if (has_prev && f_prev * rc.dt < 0) 
-                        t = (f_pos * t_neg - f_neg * t_pos) / (f_pos - f_neg);
-                    else
-                        t += rc.dt;
-                    
-                    t_prev = t;
-                    f_prev = rc.dt;
-                    has_prev = true;
-
-
-                    // buttend hit logic
-                    if (t < 0.0 || t > 1.0) {
-                        t = (t < 0) ? 0.0 : 1.0;
-                        rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                        rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
-                        double r_end = radius(t);
-                        rc.intersect(r_end, dr);
-                        bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
-                        if(enters_from_outside && rc.dp < r_end*r_end) {
-                            s_out = rc.sp + rc.c0.z();
-                            t_out = t;
-                            is_cap = true;
-                            return true;
-                        }
-                        return false;
-                    } 
-                }
-                return false;                              // hit the iteration cap, not converged
+                    return false;
+                } 
             }
-            
-            point3 curve_point(double t) const {
-                return ((u3 * t + u2) * t + u1) * t + u0;
-            }
+            return false;                              // hit the iteration cap, not converged
+        }
+        
+        point3 curve_point(double t) const {
+            return ((u3 * t + u2) * t + u1) * t + u0;
+        }
 
-            point3 curve_point(double t, const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
-                return ((u3 * t + u2) * t + u1) * t + u0;
-            }
+        point3 curve_point(double t, const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
+            return ((u3 * t + u2) * t + u1) * t + u0;
+        }
 
-            point3 tangent(double t) const {
-                return (3 * u3 * t + 2 * u2) * t + u1;
-            }
+        point3 tangent(double t) const {
+            return (3 * u3 * t + 2 * u2) * t + u1;
+        }
 
-            point3 tangent(double t,  const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
-                return (3 * u3 * t + 2 * u2) * t + u1;
-            }
+        point3 tangent(double t,  const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
+            return (3 * u3 * t + 2 * u2) * t + u1;
+        }
 
-            double radius(double t) const {
-                return ((1-t) * r1 + t * r2);
-            }
+        double radius(double t) const {
+            return ((1-t) * r1 + t * r2);
+        }
 
-            void to_rcc(const ray& r, point3& u0_rcc, vec3& u1_rcc, vec3& u2_rcc, vec3& u3_rcc) const {
-                vec3 b1, b2, b3;
-                ortho_basis(r.direction(), b1, b2, b3);
+        void set_bbox(const std::array<point3, 4>& cp) {
+            double R = std::fmax(r1, r2);
+            aabb hull(aabb(cp[0], cp[1]), aabb(cp[2], cp[3]));
 
-                vec3 a = u0 - r.origin();
-                u0_rcc = vec3(dot(a, b2), dot(a, b3), dot(a, b1));
-                u1_rcc = vec3(dot(u1, b2), dot(u1, b3), dot(u1, b1));
-                u2_rcc = vec3(dot(u2, b2), dot(u2, b3), dot(u2, b1));
-                u3_rcc = vec3(dot(u3, b2), dot(u3, b3), dot(u3, b1));
+            bbox = aabb(
+                interval(hull.x.min - R, hull.x.max + R),
+                interval(hull.y.min - R, hull.y.max + R),
+                interval(hull.z.min - R, hull.z.max + R));
             }
+        void to_rcc(const ray& r, point3& u0_rcc, vec3& u1_rcc, vec3& u2_rcc, vec3& u3_rcc) const {
+            vec3 b1, b2, b3;
+            ortho_basis(r.direction(), b1, b2, b3);
+
+            vec3 a = u0 - r.origin();
+            u0_rcc = vec3(dot(a, b2), dot(a, b3), dot(a, b1));
+            u1_rcc = vec3(dot(u1, b2), dot(u1, b3), dot(u1, b1));
+            u2_rcc = vec3(dot(u2, b2), dot(u2, b3), dot(u2, b1));
+            u3_rcc = vec3(dot(u3, b2), dot(u3, b3), dot(u3, b1));
+        }
 
             
 };
