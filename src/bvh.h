@@ -53,8 +53,6 @@ class bvh_node : public hittable {
             left  = build(objects, start, mid);
             right = build(objects, mid, end);
         }
-
-        
     }
 
     bool hit(const ray& r, interval ray_t, hit_record& rec) const override {

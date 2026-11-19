@@ -51,6 +51,229 @@ struct RayConeIntersection {
 
 };
 
+struct bezier_curve_data {
+    point3 u0, u1, u2, u3;
+    double r1, r2;
+    shared_ptr<material> mat;
+
+    bool trace_from(double t_start, double a, double b,
+                const point3& u0_rcc, const vec3& u1_rcc,
+                const vec3& u2_rcc, const vec3& u3_rcc,
+                double& s_out, double& t_out,
+                bool& is_cap) const {
+        const double eps = 5e-5; // if ∆t smaller eps: success
+        const int max_iter = 50; 
+        const double dr = r2 - r1; // derivative of linear radius
+        interval clamp_dt(-(b - a)/2.0, (b - a)/2.0); // clamp magnitude of ∆t to 0.5
+        is_cap = false;
+        RayConeIntersection rc;
+        double t = t_start;
+
+        // regula falsi/bisection variables
+        double t_pos, f_pos, t_neg, f_neg;
+        bool n_brack = false, p_brack = false, bracket = false;
+        // previous iteration signs for regula falsi
+        double t_prev, f_prev;
+        bool has_prev = false;
+
+        for (int iter = 0; iter < max_iter; ++iter) {
+            rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+            rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+            bool real = rc.intersect(radius(t), dr);
+            
+            // converged: decide now, while s and t still belong together
+            if (std::fabs(rc.dt) < eps) {
+                if (!real) return false;          // converged phantom = near miss
+                s_out = rc.s + rc.c0.z();
+                t_out = t;
+                return true;
+            }
+
+            rc.dt = clamp_dt.clamp(rc.dt);
+            
+            // set regula falsi
+            if (rc.dt > 0) {
+                f_pos = rc.dt;
+                t_pos = t;
+                p_brack = true;
+            } else {
+                f_neg = rc.dt;
+                t_neg = t;
+                n_brack = true;
+            }
+            if (p_brack && n_brack) bracket = true;
+            
+            // no bracket exists, normal step, otherwise regula falsi step
+            if (bracket && (iter % 4) == 0) 
+                t = (t_pos + t_neg) / 2;
+            else if (has_prev && f_prev * rc.dt < 0) 
+                t = (f_pos * t_neg - f_neg * t_pos) / (f_pos - f_neg);
+            else
+                t += rc.dt;
+            
+            t_prev = t;
+            f_prev = rc.dt;
+            has_prev = true;
+
+
+            // buttend hit logic
+            if (t < a || t > b) {
+                bool at_true_end = (t < a && a == 0.0) || (t > b && b == 1.0);
+                if (!at_true_end) return false;   // interior joint: neighbor handles it
+
+                t = (t < a) ? a : b;
+                rc.c0 = curve_point(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                rc.cd = tangent(t, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+                double r_end = radius(t);
+                rc.intersect(r_end, dr);
+                bool enters_from_outside = (t == 0) ? rc.cd.z() > 0 : rc.cd.z() < 0;
+                if(enters_from_outside && rc.dp < r_end*r_end) {
+                    s_out = rc.sp + rc.c0.z();
+                    t_out = t;
+                    is_cap = true;
+                    return true;
+                }
+                return false;
+            } 
+        }
+        return false;                              // hit the iteration cap, not converged
+    }
+
+    point3 curve_point(double t) const {
+        return ((u3 * t + u2) * t + u1) * t + u0;
+    }
+
+    point3 curve_point(double t, const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
+        return ((u3 * t + u2) * t + u1) * t + u0;
+    }
+
+    point3 tangent(double t) const {
+        return (3 * u3 * t + 2 * u2) * t + u1;
+    }
+
+    point3 tangent(double t,  const point3& u0, const vec3& u1, const vec3& u2, const vec3&  u3) const {
+        return (3 * u3 * t + 2 * u2) * t + u1;
+    }
+
+    double radius(double t) const {
+        return ((1-t) * r1 + t * r2);
+    }
+
+    void to_rcc(const ray& r, point3& u0_rcc, vec3& u1_rcc, vec3& u2_rcc, vec3& u3_rcc) const {
+        vec3 b1, b2, b3;
+        ortho_basis(r.direction(), b1, b2, b3);
+
+        vec3 h = u0 - r.origin();
+        u0_rcc = vec3(dot(h, b2), dot(h, b3), dot(h, b1));
+        u1_rcc = vec3(dot(u1, b2), dot(u1, b3), dot(u1, b1));
+        u2_rcc = vec3(dot(u2, b2), dot(u2, b3), dot(u2, b1));
+        u3_rcc = vec3(dot(u3, b2), dot(u3, b3), dot(u3, b1));
+    }
+};
+
+class bezier_segment : public hittable {
+    public:
+        bezier_segment(shared_ptr<bezier_curve_data> curve, double a, double b)
+                        : curve(curve), a(a), b(b) {
+            double h = b-a;
+            double R = std::fmax(curve->radius(a), curve->radius(b));
+            point3 q0, q1, q2, q3;
+            point3 ca, cb;
+            vec3 ta, tb;
+            ca = curve->curve_point(a); cb = curve->curve_point(b);
+            ta = curve->tangent(a);     tb = curve->tangent(b);
+            q0 = ca;
+            q1 = ca + (h/3.0)*ta;
+            q2 = cb - (h/3.0)*tb;
+            q3 = cb;
+
+            aabb hull(aabb(q0, q1), aabb(q2, q3));
+
+            bbox = aabb(
+                interval(hull.x.min - R, hull.x.max + R),
+                interval(hull.y.min - R, hull.y.max + R),
+                interval(hull.z.min - R, hull.z.max + R));
+        }
+
+        bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
+            point3 u0_rcc; vec3 u1_rcc, u2_rcc, u3_rcc;
+            curve->to_rcc(r, u0_rcc, u1_rcc, u2_rcc, u3_rcc);
+
+            double s, t;
+            bool is_cap = false;
+            bool hit = false;
+            // start at closer end
+            double za = curve->curve_point(a, u0_rcc, u1_rcc, u2_rcc, u3_rcc).z();
+            double zb = curve->curve_point(b, u0_rcc, u1_rcc, u2_rcc, u3_rcc).z();
+            double t_start = (za < zb) ? a : b;
+            double t_other = (za < zb) ? b : a;
+            double len = r.direction().length();
+
+            hit = curve->trace_from(t_start, a, b, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s, t, is_cap);
+            if (hit) { 
+                s /= len; 
+                if (!ray_t.surrounds(s)) hit = false; 
+            }
+            // if closer end returned false/is outside of t range try with far end
+            if (!hit) {
+                hit = curve->trace_from(t_other, a, b, u0_rcc, u1_rcc, u2_rcc, u3_rcc, s, t, is_cap);
+                if (hit) { 
+                    s /= len; 
+                    if (!ray_t.surrounds(s)) hit = false; 
+                }
+            }
+
+            if (!hit) return false;
+
+            vec3 p = r.at(s);
+            
+            vec3 n;
+            if (is_cap) {
+                n = (t == 0) ? -curve->tangent(0) : curve->tangent(1);   
+                n = unit_vector(n);
+            }
+            else {
+                point3 world_c = curve->curve_point(t);
+                vec3 world_dc = curve->tangent(t);
+                vec3 v = p - world_c;
+                n = v - dot(v, world_dc)*world_dc/world_dc.length_squared();
+                n = unit_vector(n);
+                n = unit_vector(n - (curve->r2 - curve->r1)/(world_dc.length()) * unit_vector(world_dc));
+            }
+            rec.set_face_normal(r, n);
+            rec.t = s;
+            rec.mat = curve->mat;
+            rec.p = p;
+
+            return true;
+        }
+
+        aabb bounding_box() const override { return bbox; }
+    private:
+        shared_ptr<bezier_curve_data> curve;
+        double a, b;
+        aabb bbox;
+};
+
+inline void add_bezier_segments(hittable_list& world, const std::array<point3, 4>& control_points, 
+                    double r1, double r2, shared_ptr<material> mat, int n_segments = 8) {
+    auto curve = make_shared<bezier_curve_data>();  
+
+    curve->u0 = control_points[0];
+    curve->u1 = 3*(control_points[1] - control_points[0]);
+    curve->u2 = 3*(control_points[0]-2*control_points[1]+control_points[2]);
+    curve->u3 = -control_points[0]+3*control_points[1]-3*control_points[2]+control_points[3];
+    curve->r1 = r1;
+    curve->r2 = r2;
+    curve->mat = mat;
+    double step_size = 1.0/double(n_segments);
+    for (int i = 0; i < n_segments; i++) {
+        auto a = (i == 0) ? 0.0 : i*step_size;
+        auto b = (i == n_segments-1) ? 1.0 : (i+1)*step_size;
+        world.add(make_shared<bezier_segment>(curve, a, b));
+    }
+};
+
 class bezier_hair_curve : public hittable {
     public:
         bezier_hair_curve(const std::array<point3, 4>& control_points, 
@@ -118,7 +341,7 @@ class bezier_hair_curve : public hittable {
 
     private:
         point3 u0, u1, u2, u3; // bezier curve points in world coordinates
-        point3 u0_rcc, u1_rcc, u2_rcc, u3_rcc; // bezier curves points in current rays rcc
+        //point3 u0_rcc, u1_rcc, u2_rcc, u3_rcc; // bezier curves points in current rays rcc
         double r1, r2;
         shared_ptr<material> mat;
         aabb bbox;
