@@ -245,7 +245,7 @@ void render_curly_sphere_world(hittable_list& world) {
     camera cam;
     cam.aspect_ratio = 9.0 / 9.0;
     cam.image_width = 2000;
-    cam.samples_per_pixel = 10;
+    cam.samples_per_pixel = 1;
     cam.max_depth = 50;
     cam.vfov = 42;
     cam.lookfrom = point3(0, 2.0, 8.5);

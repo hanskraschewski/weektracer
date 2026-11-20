@@ -162,7 +162,7 @@ class camera {
                 double occlusion = 1.0;
                 for (int i = 0; i < 4; i++)
                 {
-                    auto scatter_direction = rec.normal + random_unit_vector();
+                    auto scatter_direction = random_on_hemisphere(rec.normal);
 
                     if (scatter_direction.near_zero()) 
                         scatter_direction = unit_vector(rec.normal);
