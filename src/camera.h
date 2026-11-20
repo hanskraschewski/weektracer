@@ -38,7 +38,8 @@ class camera {
                     color pixel_color(0,0,0);
                     for (int sample = 0; sample < samples_per_pixel; sample++) {
                         ray r = get_ray(i, j);
-                        pixel_color += ray_color(r, max_depth, world);
+                        //pixel_color += ray_color(r, max_depth, world);
+                        pixel_color += ao_ray_color(r, world);
                     }
 
                     image[j * image_width + i] = pixel_samples_scale * pixel_color;
@@ -144,9 +145,43 @@ class camera {
                 return color(0,0,0);
             }
 
+
             vec3 unit_direction = unit_vector(r.direction());
             auto a = 0.5*(unit_direction.y() + 1.0);
             return (1.0 - a) * color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+        }
+
+        color ao_ray_color(const ray& r, const hittable& world) {
+            hit_record rec;
+            
+            if (world.hit(r, interval(0.001, infinity), rec)) {
+                interval ao_interval(0.0, 5.0);
+                color attenuation;
+
+                hit_record records[4] = {};
+                double occlusion = 1.0;
+                for (int i = 0; i < 4; i++)
+                {
+                    auto scatter_direction = rec.normal + random_unit_vector();
+
+                    if (scatter_direction.near_zero()) 
+                        scatter_direction = unit_vector(rec.normal);
+                    ray ao_ray = ray(rec.p, scatter_direction, r.time());
+                    if (world.hit(ao_ray, interval(0.001, infinity), records[i])) {
+                        occlusion -= (1.0 - (ao_interval.clamp(records[i].t)/ 5.0)) * 0.25;
+                    }    
+                }
+                attenuation = rec.mat->get_albedo();
+                return attenuation * occlusion;
+                
+            }
+
+            // set sky color
+            vec3 unit_direction = unit_vector(r.direction());
+            auto a = 0.5*(unit_direction.y() + 1.0);
+            return (1.0 - a) * color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+
+
         }
 
         void write_P3(std::vector<color>& image) {

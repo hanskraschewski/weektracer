@@ -243,9 +243,9 @@ void render_curly_sphere_world(hittable_list& world) {
     world = hittable_list(make_shared<bvh_node>(world));
 
     camera cam;
-    cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 3800;
-    cam.samples_per_pixel = 100;
+    cam.aspect_ratio = 9.0 / 9.0;
+    cam.image_width = 2000;
+    cam.samples_per_pixel = 10;
     cam.max_depth = 50;
     cam.vfov = 42;
     cam.lookfrom = point3(0, 2.0, 8.5);

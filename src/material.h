@@ -13,6 +13,8 @@ class material {
         ) const {
             return false;
         }
+
+        virtual color get_albedo() const = 0;
 };
 
 class lambertian : public material {
@@ -30,10 +32,12 @@ class lambertian : public material {
             attenuation = albedo;
             return true;
         }
-
+        color get_albedo() const { return albedo; };
     private:
         color albedo;
 };
+
+
 
 class metal : public material {
     public:
@@ -47,6 +51,7 @@ class metal : public material {
             attenuation = albedo;
             return (dot(scattered.direction(), rec.normal) > 0);
         }
+        color get_albedo() const { return albedo; };
     private:
         color albedo;
         double fuzz;
@@ -78,6 +83,7 @@ class dielectric : public material {
             scattered = ray(rec.p, direction, r_in.time());
             return true;
         }
+        color get_albedo() const { return color(1.0, 1.0, 1.0); };
     private:
         double refraction_index;
 
