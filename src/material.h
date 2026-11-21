@@ -2,7 +2,7 @@
 #define MATERIAL_H
 
 #include "hittable.h"
-
+#include "texture.h"
 
 class material {
     public:
@@ -14,12 +14,13 @@ class material {
             return false;
         }
 
-        virtual color get_albedo() const = 0;
+        virtual color get_albedo(const hit_record& rec) const = 0;
 };
 
 class lambertian : public material {
     public:
-        lambertian(const color& albedo) : albedo(albedo) {}
+        lambertian(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
+        lambertian(shared_ptr<texture> tex) : tex(tex) {}
 
         bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered) 
         const override {
@@ -29,12 +30,14 @@ class lambertian : public material {
                 scatter_direction = rec.normal;
 
             scattered = ray(rec.p, scatter_direction, r_in.time());
-            attenuation = albedo;
+            attenuation = tex->value(rec.u, rec.v, rec.p);
             return true;
         }
-        color get_albedo() const { return albedo; };
+        color get_albedo(const hit_record& rec) const { 
+            return tex->value(rec.u, rec.v, rec.p);
+        };
     private:
-        color albedo;
+        shared_ptr<texture> tex;
 };
 
 
@@ -51,7 +54,7 @@ class metal : public material {
             attenuation = albedo;
             return (dot(scattered.direction(), rec.normal) > 0);
         }
-        color get_albedo() const { return albedo; };
+        color get_albedo(const hit_record& rec) const { return albedo; };
     private:
         color albedo;
         double fuzz;
@@ -83,7 +86,7 @@ class dielectric : public material {
             scattered = ray(rec.p, direction, r_in.time());
             return true;
         }
-        color get_albedo() const { return color(1.0, 1.0, 1.0); };
+        color get_albedo(const hit_record& rec) const { return color(1.0, 1.0, 1.0); };
     private:
         double refraction_index;
 

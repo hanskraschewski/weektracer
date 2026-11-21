@@ -6,12 +6,15 @@
 #include "hittable_list.h"
 #include "material.h"
 #include "sphere.h"
-#include "bezier_hair_curve.h"
-#include <omp.h>
+#include "texture.h"
 
-void render_sphere_world(hittable_list& world) {
-    auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
-    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
+#include "bezier_hair_curve.h"
+
+
+void spheres() {
+    hittable_list world;
+    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
+    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
 
     for (int a = -14; a < 14; a++) {
         for (int b = -14; b < 14; b++) {
@@ -57,7 +60,33 @@ void render_sphere_world(hittable_list& world) {
     camera cam;
 
     cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 800;
+    cam.image_width       = 1200;
+    cam.samples_per_pixel = 50;
+    cam.max_depth         = 20;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(13,2,3);
+    cam.lookat   = point3(0,0,0);
+    cam.vup      = vec3(0,1,0);
+
+    cam.defocus_angle = 0.8;
+    cam.focus_dist    = 10.0;
+
+    cam.render(world);
+}
+
+void checkered_spheres() {
+    hittable_list world;
+
+    auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
+
+    world.add(make_shared<sphere>(point3(0,-10, 0), 10, make_shared<lambertian>(checker)));
+    world.add(make_shared<sphere>(point3(0, 10, 0), 10, make_shared<lambertian>(checker)));
+
+    camera cam;
+
+    cam.aspect_ratio      = 16.0 / 9.0;
+    cam.image_width       = 400;
     cam.samples_per_pixel = 100;
     cam.max_depth         = 50;
 
@@ -66,13 +95,35 @@ void render_sphere_world(hittable_list& world) {
     cam.lookat   = point3(0,0,0);
     cam.vup      = vec3(0,1,0);
 
-    cam.defocus_angle = 0.6;
-    cam.focus_dist    = 10.0;
+    cam.defocus_angle = 0;
 
     cam.render(world);
 }
 
-void render_strand_world(hittable_list& world) {
+void earth() {
+    auto earth_texture = make_shared<image_texture>("../textures/2k_earth_daymap.jpg");
+    auto earth_surface = make_shared<lambertian>(earth_texture);
+    auto globe = make_shared<sphere>(point3(0,0,0), 2, earth_surface);
+
+    
+    camera cam;
+
+    cam.aspect_ratio      = 16.0 / 9.0;
+    cam.image_width       = 1200;
+    cam.samples_per_pixel = 100;
+    cam.max_depth         = 50;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(12,0,-3);
+    cam.lookat   = point3(0,0,0);
+    cam.vup      = vec3(0,1,0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(hittable_list(globe));
+}
+void strands() {
+    hittable_list world;
     auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
     world.add(make_shared<sphere>(point3(0, -100.5, -1.0), 100.0, ground_material));
 
@@ -123,7 +174,8 @@ void render_strand_world(hittable_list& world) {
     cam.render(world);
 }
 
-void render_bezier_test_world(hittable_list& world) {
+void bezier_test() {
+    hittable_list world;
     auto ground_material = make_shared<lambertian>(color(0.45, 0.45, 0.45));
     world.add(make_shared<sphere>(point3(0, -100.5, 0), 100.0, ground_material));
 
@@ -154,10 +206,10 @@ void render_bezier_test_world(hittable_list& world) {
 
     camera cam;
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 1920;
-    cam.samples_per_pixel = 200;
-    cam.max_depth = 100;
-    cam.vfov = 30;
+    cam.image_width = 1200;
+    cam.samples_per_pixel = 100;
+    cam.max_depth = 50;
+    cam.vfov = 20;
     cam.lookfrom = point3(7, 5, 9);
     cam.lookat = point3(0, 0.2, 0);
     cam.vup = vec3(0, 1, 0);
@@ -166,7 +218,8 @@ void render_bezier_test_world(hittable_list& world) {
     cam.render(world);
 }
 
-void render_curly_sphere_world(hittable_list& world) {
+void curly_sphere() {
+    hittable_list world;
     constexpr double sphere_radius = 1.0;
     constexpr int strand_count = 1000;
     constexpr int curve_pieces = 10;
@@ -256,12 +309,17 @@ void render_curly_sphere_world(hittable_list& world) {
     cam.render(world);
 }
 
+
 int main() {
-    std::ios::sync_with_stdio(false);
-    
-    hittable_list world;
-    //render_sphere_world(world);
-    render_curly_sphere_world(world);
-    
+    int i = 6;
+    switch (i) {
+        case 1: spheres();                  break;
+        case 2: checkered_spheres();        break;
+        case 3: strands();                  break;
+        case 4: bezier_test();              break;
+        case 5: curly_sphere();             break;
+        case 6: earth();                    break;    
+
+    }
 }
 

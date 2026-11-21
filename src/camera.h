@@ -38,8 +38,8 @@ class camera {
                     color pixel_color(0,0,0);
                     for (int sample = 0; sample < samples_per_pixel; sample++) {
                         ray r = get_ray(i, j);
-                        //pixel_color += ray_color(r, max_depth, world);
-                        pixel_color += ao_ray_color(r, world);
+                        pixel_color += ray_color(r, max_depth, world);
+                        //pixel_color += ao_ray_color(r, world);
                     }
 
                     image[j * image_width + i] = pixel_samples_scale * pixel_color;
@@ -171,7 +171,7 @@ class camera {
                         occlusion -= (1.0 - (ao_interval.clamp(records[i].t)/ 5.0)) * 0.25;
                     }    
                 }
-                attenuation = rec.mat->get_albedo();
+                attenuation = rec.mat->get_albedo(rec);
                 return attenuation * occlusion;
                 
             }
