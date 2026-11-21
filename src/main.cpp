@@ -100,6 +100,30 @@ void checkered_spheres() {
     cam.render(world);
 }
 
+void perlin_spheres() {
+    hittable_list world;
+
+    auto pertext = make_shared<noise_texture>(4);
+    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(pertext)));
+    world.add(make_shared<sphere>(point3(0,2,0), 2, make_shared<lambertian>(pertext)));
+
+    camera cam;
+
+    cam.aspect_ratio      = 16.0 / 9.0;
+    cam.image_width       = 1200;
+    cam.samples_per_pixel = 100;
+    cam.max_depth         = 50;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(13,2,3);
+    cam.lookat   = point3(0,0,0);
+    cam.vup      = vec3(0,1,0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(world);
+}
+
 void earth() {
     auto earth_texture = make_shared<image_texture>("../textures/2k_earth_daymap.jpg");
     auto earth_surface = make_shared<lambertian>(earth_texture);
@@ -173,7 +197,6 @@ void strands() {
     cam.focus_dist = 4.0;
     cam.render(world);
 }
-
 void bezier_test() {
     hittable_list world;
     auto ground_material = make_shared<lambertian>(color(0.45, 0.45, 0.45));
@@ -217,7 +240,6 @@ void bezier_test() {
     cam.focus_dist = 10;
     cam.render(world);
 }
-
 void curly_sphere() {
     hittable_list world;
     constexpr double sphere_radius = 1.0;
@@ -311,7 +333,7 @@ void curly_sphere() {
 
 
 int main() {
-    int i = 1;
+    int i = 7;
     switch (i) {
         case 1: spheres();                  break;
         case 2: checkered_spheres();        break;
@@ -319,6 +341,7 @@ int main() {
         case 4: bezier_test();              break;
         case 5: curly_sphere();             break;
         case 6: earth();                    break;    
+        case 7: perlin_spheres();           break;
 
     }
 }
