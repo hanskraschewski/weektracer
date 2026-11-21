@@ -311,7 +311,7 @@ void curly_sphere() {
 
 
 int main() {
-    int i = 6;
+    int i = 1;
     switch (i) {
         case 1: spheres();                  break;
         case 2: checkered_spheres();        break;
