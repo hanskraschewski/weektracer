@@ -14,7 +14,14 @@ class material {
             return false;
         }
 
-        virtual color get_albedo(const hit_record& rec) const = 0;
+        // function only used for raytraced ambient occlusion, to access color without the scatter method
+        virtual color get_albedo(const hit_record& rec) const {
+            return color(1.0, 1.0, 1.0);
+        }
+
+        virtual color emitted(double u, double v, const point3& p) const {
+            return color(0,0,0);
+        }
 };
 
 class lambertian : public material {
@@ -96,6 +103,22 @@ class dielectric : public material {
             return r0 + (1-r0)*std::pow((1 - cosine), 5);
         }
 
+};
+
+class diffuse_light : public material {
+    public:
+        diffuse_light(shared_ptr<texture> tex) : tex(tex) {}
+        diffuse_light(const color & emit) : tex(make_shared<solid_color>(emit)) {}
+
+        color emitted(double u, double v, const point3& p) const override {
+            return tex->value(u, v, p);
+        }
+
+        color get_albedo(const hit_record& rec) const { 
+            return tex->value(rec.u, rec.v, rec.p);
+        };
+    private:
+        shared_ptr<texture> tex;
 };
 
 #endif
