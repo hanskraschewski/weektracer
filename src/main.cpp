@@ -9,7 +9,7 @@
 #include "quad.h"
 #include "texture.h"
 
-#include "bezier_hair_curve.h"
+#include "curves/bezier_hair_curve.h"
 
 
 void spheres() {
@@ -258,6 +258,7 @@ void earth() {
 
     cam.render(hittable_list(globe));
 }
+
 void strands() {
     hittable_list world;
     auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
@@ -449,7 +450,7 @@ void curly_sphere() {
 
 
 int main() {
-    int i = 10;
+    int i = 4;
     switch (i) {
         case 1: spheres();                  break;
         case 2: checkered_spheres();        break;
