@@ -116,11 +116,19 @@ inline vec3 random_in_unit_disk() {
 }
 
 inline vec3 random_unit_vector() {
+    /* transformation sampling, actually a bit slower due to sin/cos
+    double z = random_double(-1, 1);
+    double phi = random_double(0, 2*pi);
+    double r = sqrt(1 - z*z);
+    
+    return vec3(r * std::cos(phi), r * std::sin(phi), z);
+    */
     while (true) {
         auto p = vec3::random(-1, 1);
         auto lensq = p.length_squared();
         if (1e-160 < lensq && lensq <= 1) return p / sqrt(lensq);
     }
+    
 }
 
 inline vec3 random_on_hemisphere(const vec3& normal) {

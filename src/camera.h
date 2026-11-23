@@ -12,6 +12,7 @@ class camera {
         int image_width = 100;
         int samples_per_pixel = 10;
         int max_depth = 10;
+        color background;
 
         double vfov = 90; // Vertical view angle
         point3 lookfrom = point3(0,0,0);
@@ -38,8 +39,8 @@ class camera {
                     color pixel_color(0,0,0);
                     for (int sample = 0; sample < samples_per_pixel; sample++) {
                         ray r = get_ray(i, j);
-                        //pixel_color += ray_color(r, max_depth, world);
-                        pixel_color += ao_ray_color(r, world);
+                        pixel_color += ray_color(r, max_depth, world);
+                        //pixel_color += ao_ray_color(r, world);
                     }
 
                     image[j * image_width + i] = pixel_samples_scale * pixel_color;
@@ -136,19 +137,19 @@ class camera {
 
             hit_record rec;
 
-            if (world.hit(r, interval(0.001, infinity), rec)) {
-                ray scattered;
-                color attenuation;
-                if (rec.mat->scatter(r, rec, attenuation, scattered))
-                    return attenuation * ray_color(scattered, depth-1, world);
+            if (!world.hit(r, interval(0.001, infinity), rec))
+                return background;
+            
+            ray scattered;
+            color attenuation;
+            color color_from_emission = rec.mat->emitted(rec.u, rec.v, rec.p);
 
-                return color(0,0,0);
-            }
+            if (!rec.mat->scatter(r, rec, attenuation, scattered))
+                return color_from_emission;
 
+            color color_from_scatter = attenuation * ray_color(scattered, depth-1, world);
 
-            vec3 unit_direction = unit_vector(r.direction());
-            auto a = 0.5*(unit_direction.y() + 1.0);
-            return (1.0 - a) * color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+            return color_from_emission + color_from_scatter;
         }
 
         color ao_ray_color(const ray& r, const hittable& world) {
@@ -171,7 +172,7 @@ class camera {
                         occlusion -= (1.0 - (ao_interval.clamp(records[i].t)/ 5.0)) * 0.25;
                     }    
                 }
-                attenuation = rec.mat->get_albedo();
+                attenuation = rec.mat->get_albedo(rec);
                 return attenuation * occlusion;
                 
             }
@@ -207,4 +208,5 @@ class camera {
             file.close();
         }
 };
+
 #endif
