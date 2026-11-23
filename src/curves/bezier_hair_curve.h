@@ -1,7 +1,7 @@
 #ifndef BEZIER_HAIR_CURVE_H
 #define BEZIER_HAIR_CURVE_H
 
-#include "hittable.h"
+#include "../hittable.h"
 #include <array>
 
 struct RayConeIntersection {

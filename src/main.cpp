@@ -9,7 +9,7 @@
 #include "quad.h"
 #include "texture.h"
 
-#include "bezier_hair_curve.h"
+#include "curves/bezier_hair_curve.h"
 
 
 void spheres() {
@@ -218,9 +218,9 @@ void cornell_box() {
     camera cam;
 
     cam.aspect_ratio      = 1.0;
-    cam.image_width       = 1200;
-    cam.samples_per_pixel = 1200;
-    cam.max_depth         = 200;
+    cam.image_width       = 600;
+    cam.samples_per_pixel = 1000;
+    cam.max_depth         = 50;
     cam.background        = color(0,0,0);
 
     cam.vfov     = 40;
@@ -258,6 +258,7 @@ void earth() {
 
     cam.render(hittable_list(globe));
 }
+
 void strands() {
     hittable_list world;
     auto ground_material = make_shared<lambertian>(color(0.8, 0.8, 0.0));
