@@ -218,9 +218,9 @@ void cornell_box() {
     camera cam;
 
     cam.aspect_ratio      = 1.0;
-    cam.image_width       = 1200;
-    cam.samples_per_pixel = 1200;
-    cam.max_depth         = 200;
+    cam.image_width       = 600;
+    cam.samples_per_pixel = 1000;
+    cam.max_depth         = 50;
     cam.background        = color(0,0,0);
 
     cam.vfov     = 40;
@@ -450,7 +450,7 @@ void curly_sphere() {
 
 
 int main() {
-    int i = 4;
+    int i = 10;
     switch (i) {
         case 1: spheres();                  break;
         case 2: checkered_spheres();        break;
