@@ -126,9 +126,21 @@ inline vec3 random_unit_vector() {
     while (true) {
         auto p = vec3::random(-1, 1);
         auto lensq = p.length_squared();
-        if (1e-160 < lensq && lensq <= 1) return p / sqrt(lensq);
+        if (1e-12 < lensq && lensq <= 1) return p / sqrt(lensq);
     }
-    
+}
+
+inline vec3 random_ortho_vector(const vec3& v1) {
+    vec3 tangent = unit_vector(v1);
+
+    while (true) {
+        vec3 candidate = random_unit_vector();
+        vec3 perpendicular = cross(tangent, candidate);
+
+        if (perpendicular.length_squared() > 1e-12) {
+            return unit_vector(perpendicular);
+        }
+    }
 }
 
 inline vec3 random_on_hemisphere(const vec3& normal) {
@@ -155,13 +167,27 @@ inline vec3 normalize(const vec3& v) {
     return unit_vector(v);
 }
 
-inline void ortho_basis(const vec3& v, vec3& b0, vec3& b1, vec3& b2) {
+struct ortho_basis {
+    vec3 b0;
+    vec3 b1;
+    vec3 b2;
+};
+
+inline ortho_basis ortho_basis_from_vec(const vec3& v) {
+    vec3 b0, b1, b2;
     b0 = unit_vector(v);
     double sign = copysignf(1.0f, b0.z());
     const double a = -1.0f / (sign + b0.z());
     const double b = b0.x() * b0.y() * a;
     b1 = vec3(1.0f + sign * b0.x() * b0.x() * a, sign * b, -sign * b0.x());
     b2 = vec3(b, sign + b0.y() * b0.y() * a, -b0.y()); 
+    ortho_basis basis;
+    basis.b0 = b0; basis.b1 = b1; basis.b2 = b2;
+    return basis;
+}
+
+inline vec3 to_basis(const ortho_basis& basis, const vec3& v) {
+    return vec3(dot(v, basis.b1), dot(v, basis.b2), dot(v, basis.b0));
 }
 
 

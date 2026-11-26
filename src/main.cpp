@@ -272,7 +272,7 @@ void strands() {
         point3(1.8, 1.25, 0.9)
     };
 
-    auto glass = make_shared<dielectric>(1.0 / 1.3);
+    auto glass = make_shared<dielectric>(1.5);
     std::array<point3, 4> control_points2 = {
         point3(1.9, 0.35, -0.75),
         point3(1.55, 0.35, -0.75),
@@ -288,9 +288,9 @@ void strands() {
         point3(0.6, 0.35, 1.2)
     };
 
-    add_bezier_segments(world, control_points1, 0.06, 0.01, metallic);
-    add_bezier_segments(world, control_points2, 0.06, 0.01, metallic);
-    add_bezier_segments(world, control_points3, 0.06, 0.01, lambert);
+    add_circle_sweep(world, control_points1, 0.06, 0.01, metallic);
+    add_circle_sweep(world, control_points2, 0.06, 0.01, glass);
+    add_circle_sweep(world, control_points3, 0.06, 0.01, lambert);
     //world.add(make_shared<bezier_hair_curve>(control_points1, 0.06, 0.01, metallic));
     //world.add(make_shared<bezier_hair_curve>(control_points2, 0.06, 0.01, metallic));
     //world.add(make_shared<bezier_hair_curve>(control_points3, 0.06, 0.01, lambert));
@@ -335,20 +335,20 @@ void bezier_test() {
                 0.2 + 0.06 * row,
                 0.75 - 0.035 * column));
 
-            add_bezier_segments(world, control_points, radius, radius * 0.55, strand_material);
+            add_circle_sweep(world, control_points, radius, radius * 0.55, strand_material);
         }
     }
 
     world = hittable_list(make_shared<bvh_node>(world));
 
     camera cam;
-    cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 1200;
-    cam.samples_per_pixel = 100;
+    cam.aspect_ratio = 1.0;
+    cam.image_width = 1000;
+    cam.samples_per_pixel = 50;
     cam.max_depth = 50;
     cam.background        = color(0.70, 0.80, 1.00);
 
-    cam.vfov = 20;
+    cam.vfov = 25;
     cam.lookfrom = point3(7, 5, 9);
     cam.lookat = point3(0, 0.2, 0);
     cam.vup = vec3(0, 1, 0);
@@ -356,6 +356,109 @@ void bezier_test() {
     cam.focus_dist = 10;
     cam.render(world);
 }
+
+void curly_strands_showcase() {
+    hittable_list world;
+    constexpr double sphere_radius = 1.0;
+    constexpr int strand_count = 18;
+    constexpr int curve_pieces = 5;
+    constexpr double golden_angle = 2.399963229728653;
+
+    auto ground_material = make_shared<lambertian>(color(0.42, 0.42, 0.42));
+    world.add(make_shared<sphere>(point3(0, -101.0, 0), 100.0, ground_material));
+    auto sphere_material = make_shared<metal>(color(0.3, 0.24, 0.2), 0.15);
+    world.add(make_shared<sphere>(point3(0, 0, 0), sphere_radius, sphere_material));
+
+    auto strand_material = make_shared<lambertian>(color(0.12, 0.42, 0.82));
+    for (int i = 0; i < strand_count; ++i) {
+        double y = 1.0 - 2.0 * (i + 0.5) / strand_count;
+        double ring_radius = std::sqrt(1.0 - y * y);
+        double azimuth = golden_angle * i;
+        vec3 outward(ring_radius * std::cos(azimuth), y,
+                     ring_radius * std::sin(azimuth));
+
+        vec3 reference_axis = std::fabs(outward.y()) < 0.9
+            ? vec3(0, 1, 0) : vec3(1, 0, 0);
+        vec3 tangent_axis = unit_vector(cross(reference_axis, outward));
+        vec3 bitangent_axis = cross(outward, tangent_axis);
+        double strand_length = 1.2 + 0.45 * (i % 5) / 4.0;
+        double curl_radius = 0.2 + 0.15 * (i % 4) / 3.0;
+        double turns = 1.0 + 0.45 * (i % 3) / 2.0;
+        double phase = golden_angle * (i % 7);
+        double angular_speed = 2.0 * pi * turns;
+        double strand_radius = 0.035 + 0.012 * (i % 4) / 3.0;
+
+        auto centerline = [&](double t) {
+            double angle = phase + angular_speed * t;
+            vec3 swirl = std::cos(angle) * tangent_axis + std::sin(angle) * bitangent_axis;
+            return outward * (sphere_radius + strand_length * t)
+                 + swirl * (curl_radius * t);
+        };
+        auto tangent = [&](double t) {
+            double angle = phase + angular_speed * t;
+            vec3 swirl = std::cos(angle) * tangent_axis + std::sin(angle) * bitangent_axis;
+            vec3 swirl_tangent = -std::sin(angle) * tangent_axis + std::cos(angle) * bitangent_axis;
+            return outward * strand_length + swirl * curl_radius
+                 + swirl_tangent * (curl_radius * t * angular_speed);
+        };
+
+        for (int piece = 0; piece < curve_pieces; ++piece) {
+            double t0 = double(piece) / curve_pieces;
+            double t1 = double(piece + 1) / curve_pieces;
+            double dt = t1 - t0;
+            point3 p0 = centerline(t0);
+            point3 p1 = centerline(t1);
+            vec3 d0 = tangent(t0);
+            vec3 d1 = tangent(t1);
+            std::array<point3, 4> control_points = {
+                p0,
+                p0 + d0 * (dt / 3.0),
+                p1 - d1 * (dt / 3.0),
+                p1
+            };
+            add_circle_sweep(world, control_points,
+                strand_radius * (1.0 - 0.45 * t0),
+                strand_radius * (1.0 - 0.45 * t1),
+                strand_material, 1);
+        }
+    }
+
+    auto featured_material = make_shared<lambertian>(color(0.95, 0.48, 0.08));
+    constexpr double featured_radius = 0.065;
+    std::array<std::array<point3, 4>, 4> featured_curves = {{
+        {point3(-0.82, 0.38, 0.55), point3(-0.47, 0.78, 0.78),
+         point3(-0.08, 1.08, 0.74), point3(0.22, 1.12, 0.54)},
+        {point3(0.22, 1.12, 0.54), point3(0.52, 1.16, 0.34),
+         point3(0.72, 0.72, 0.12), point3(0.54, 0.38, 0.28)},
+        {point3(0.54, 0.38, 0.28), point3(0.36, 0.04, 0.44),
+         point3(0.08, 0.12, 0.72), point3(-0.2, 0.36, 0.8)},
+        {point3(-0.2, 0.36, 0.8), point3(-0.5, 0.6, 0.88),
+         point3(-0.66, 0.78, 0.82), point3(-0.76, 0.64, 0.58)}
+    }};
+    for (auto& control_points : featured_curves) {
+        for (auto& point : control_points)
+            point = point + vec3(0, 0, 0.75);
+        add_circle_sweep(world, control_points, featured_radius, featured_radius * 0.8,
+                            featured_material, 1);
+    }
+
+    world = hittable_list(make_shared<bvh_node>(world));
+
+    camera cam;
+    cam.aspect_ratio = 16.0 / 9.0;
+    cam.image_width = 1000;
+    cam.samples_per_pixel = 20;
+    cam.max_depth = 20;
+    cam.background = color(0.70, 0.80, 1.00);
+    cam.vfov = 38;
+    cam.lookfrom = point3(3.3, 2.6, 7.5);
+    cam.lookat = point3(0, 0.5, 0);
+    cam.vup = vec3(0, 1, 0);
+    cam.defocus_angle = 0;
+    cam.focus_dist = 8.0;
+    cam.render(world);
+}
+
 void curly_sphere() {
     hittable_list world;
     constexpr double sphere_radius = 1.0;
@@ -424,7 +527,7 @@ void curly_sphere() {
                 p1
             };
 
-            add_bezier_segments(world, control_points,
+            add_circle_sweep(world, control_points,
                 strand_radius * (1.0 - 0.65 * t0),
                 strand_radius * (1.0 - 0.65 * t1),
                 strand_material, 1);
@@ -450,7 +553,7 @@ void curly_sphere() {
 
 
 int main() {
-    int i = 10;
+    int i = 3;
     switch (i) {
         case 1: spheres();                  break;
         case 2: checkered_spheres();        break;
@@ -462,7 +565,7 @@ int main() {
         case 8: quads();                    break;
         case 9: simple_light();             break;
         case 10: cornell_box();             break;
+        case 12: curly_strands_showcase();  break;
 
     }
 }
-
